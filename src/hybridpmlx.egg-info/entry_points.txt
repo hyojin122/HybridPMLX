@@ -1,0 +1,2 @@
+[console_scripts]
+hybridpmlx = hybridpmlx.cli:main

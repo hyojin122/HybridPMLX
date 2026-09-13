@@ -1,0 +1,81 @@
+project: dementia_ordinal_weibull
+
+data:
+  file: data/dementia_example.csv
+  id_column: ID
+  idv_column: AGE_SCALED
+  dv_column: STATUS
+  feature_columns:
+    - Education
+    - MMSE_Orientation_Time
+    - MMSE_Attention
+    - MMSE_Recall
+    - MMSE_Language
+    - SNSB_Attention
+    - SNSB_Language
+    - SNSB_Visuospatial
+    - SNSB_Memory
+    - SNSB_Frontal
+
+split:
+  method: random
+  test_ratio: 0.20
+  stratify_by: STATUS
+  seed: 42
+
+model:
+  probability_epsilon: 1.0e-10
+  probabilities:
+    normal: exp(-(IDV / lambda_mci) ** shape)
+    mci: exp(-(IDV / lambda_dem) ** shape) - exp(-(IDV / lambda_mci) ** shape)
+    dementia: 1 - exp(-(IDV / lambda_dem) ** shape)
+  parameters:
+    lambda_mci:
+      initial: 0.826
+      personalized: true
+      constraint: {type: positive}
+    difference:
+      initial: 0.064
+      personalized: true
+      constraint: {type: positive}
+    lambda_dem:
+      derived: lambda_mci + difference
+    shape_excess:
+      initial: 1.76
+      personalized: false
+      constraint: {type: positive}
+    shape:
+      derived: 1.001 + shape_excess
+
+network:
+  hidden_layers: [6, 4]
+  activation: softplus
+  dropout: 0.0
+
+objective:
+  loss: categorical_nll
+  eta_penalty: {type: l2, weight: 0.01}
+
+training:
+  folds: 5
+  stratify_by: STATUS
+  seed: 42
+  batch_size: 32
+  batch_unit: observation
+  progress_every: 25
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  max_epochs: 3000
+  gradient_clip: 1.0
+  patience: 100
+  min_delta: 0.0001
+  minimum_epochs: 0
+
+shap:
+  enabled: true
+  method: deep
+  background_size: 100
+  targets: [lambda_mci, difference]
+
+output:
+  directory: results/dementia

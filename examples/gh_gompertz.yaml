@@ -1,0 +1,75 @@
+project: gh_gompertz
+
+data:
+  file: data/GH_data_with_split.csv
+  id_column: ID
+  idv_column: sum_dose
+  dv_column: score100
+  feature_columns: [sex, IGFBP3, IGF1, blood_glc, T4, P, BAGA, mother, father, MPH, BMI, agefirst]
+
+split:
+  method: random
+  test_ratio: 0.20
+  seed: 42
+
+model:
+  equation: LwrAsy + TtlGrwth * exp(-exp(-Apprch * (IDV - Timing)))
+  parameters:
+    LwrAsy:
+      initial: 0.347
+      personalized: true
+      eta_scale: 3.0
+      constraint: {type: bounded, lower: 0.000001, upper: 99.999999}
+    TtlGrwth:
+      initial: 18.77
+      personalized: true
+      eta_scale: 3.0
+      constraint:
+        type: dynamic_bounded
+        lower: 0.000001
+        upper_constant: 100.0
+        upper_parameter: LwrAsy
+        upper_multiplier: -1.0
+    Apprch:
+      initial: 0.02005
+      personalized: true
+      constraint: {type: relative_log, log_scale: 0.2}
+    Timing:
+      initial: 54.06
+      personalized: true
+      constraint: {type: absolute_change, value: 5.0, lower: 0.000001}
+
+network:
+  hidden_layers: [64, 64]
+  activation: softplus
+  dropout: 0.2
+
+objective:
+  loss: smooth_l1
+  beta: 0.1
+  eta_penalty: {type: mean_anchor, weight: 1.0e-5}
+  monotonicity: {enabled: true, direction: increasing, idv_step: 0.1, weight: 1.0e-4}
+
+training:
+  folds: 5
+  seed: 42
+  batch_size: 32
+  batch_unit: individual
+  ids_per_batch: 1
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  max_epochs: 1000
+  gradient_clip: 1.0
+  patience: 50
+  min_delta: 0.0001
+  minimum_epochs: 300
+  progress_every: 25
+
+shap:
+  enabled: true
+  method: deep
+  background_size: 100
+  targets: all_eta
+
+output:
+  directory: results/gh
